@@ -5,9 +5,9 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <math.h>
-#include <assert.h>
-#include <sys/types.h>  
-#include <sys/stat.h>  
+#include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <errno.h>
 
 typedef struct WordNode {
@@ -60,9 +60,15 @@ void search_directory(const char* path, FileArr *files, const char* suffix){
         }
         snprintf(full, sizeof(full), "%s/%s", path, entry->d_name);
 
-        if (entry->d_type == DT_DIR){
+        struct stat st;
+        //switched to stat for robustness instead of using d_type
+        if(stat(full, &st) == -1){
+            perror(full);
+            continue;
+        }
+        if(S_ISDIR(st.st_mode)){
             search_directory(full, files, suffix);
-        } else {
+        } else if(S_ISREG(st.st_mode)){
             if(has_suffix(entry->d_name,suffix)){
                 if((files->count) == files->size){
                     char** temp = realloc(files->paths, (files->size) * 2 * (sizeof(char *)));
@@ -79,6 +85,7 @@ void search_directory(const char* path, FileArr *files, const char* suffix){
             }
         }
     }
+
     closedir(dp);
 }
 
@@ -90,6 +97,9 @@ void find_file(const char *path, FileArr *files, const char* suffix){
     }
 
     if(S_ISREG(st.st_mode)){
+        if(!has_suffix(path, suffix)){
+            return;
+        }
         if((files->count) == files->size){
             char** temp = realloc(files->paths, (files->size) * 2 * (sizeof(char *)));
             if (temp == NULL){
@@ -130,6 +140,11 @@ void insert_wordNode(WFD *dist, char* word){
         else if(cmp > 0){
             node->count = 1;
             node->word = strdup(word);
+            if(node->word == NULL){
+                perror("strdup");
+                free(node);
+                return;
+            }
             node->next = current;
             dist->total_words++;
             if(previous == NULL){
@@ -147,6 +162,11 @@ void insert_wordNode(WFD *dist, char* word){
 
     node->count = 1;
     node->word = strdup(word);
+    if(node->word == NULL){
+        perror("strdup");
+        free(node);
+        return;
+    }
     node->next = NULL;
     if(previous == NULL){
         dist->head = node;
@@ -159,6 +179,9 @@ void insert_wordNode(WFD *dist, char* word){
 
 void compute_frequency(WFD *dist){
     int total_words = dist->total_words;
+    if(total_words == 0){
+        return;
+    } 
     WordNode *current = dist->head;
     while(current){
         current->frequency = (double)current->count / total_words;
@@ -173,21 +196,37 @@ void tokenize_file(WFD *dist, char* path){
         return;
     }
 
-    int n; 
+    int n;
     char c;
-    char word[4096];
-    int word_index = 0; 
+    int word_index = 0;
+    int word_cap = 16;
+    char *word = malloc(word_cap);
+    if(word == NULL){
+        perror("malloc");
+        close(fd);
+        return;
+    }
 
     while((n = read(fd, &c, 1)) > 0){
-        // switched from c == ' ' || c == '\n' as isspace covers more
-        if(isspace(c)){
+        if(isspace(c) || (!isalpha(c) && !isdigit(c) && c != '-')){
             word[word_index] = '\0';
             if(word_index > 0){
                 insert_wordNode(dist, word);
             }
             word_index = 0;
         }
-        else if(isalpha(c) || isdigit(c) || c== '-'){
+        else{
+            if(word_index >= word_cap - 1){
+                char *temp = realloc(word, word_cap * 2);
+                if(temp == NULL){
+                    perror("realloc");
+                    free(word);
+                    close(fd);
+                    return;
+                }
+                word = temp;
+                word_cap *= 2;
+            }
             word[word_index] = tolower(c);
             word_index++;
         }
@@ -196,9 +235,10 @@ void tokenize_file(WFD *dist, char* path){
     // handle last word if file doesn't end with space/newline
     if(word_index > 0){
         word[word_index] = '\0';
-        insert_wordNode(dist,word);
-    } 
+        insert_wordNode(dist, word);
+    }
 
+    free(word);
     close(fd);
 }
 
@@ -247,7 +287,13 @@ double computeJSD(WFD *file_a, WFD *file_b){
 int compare_fn(const void *a, const void *b){
     Comparison *ca = (Comparison *)a;
     Comparison *cb = (Comparison *)b;
-    return cb->combined_word_count - ca->combined_word_count;
+    if(cb->combined_word_count > ca->combined_word_count){
+        return 1;
+    } 
+    if(cb->combined_word_count < ca->combined_word_count){
+        return -1;
+    } 
+    return 0;
 }
 
 
@@ -260,14 +306,25 @@ void analysis_phase(FileArr *files){
     }
 
     WFD *wfds = malloc(file_amount * sizeof(WFD));
+    if(wfds == NULL){
+        perror("malloc");
+        exit(1);
+    }
     for(int i = 0; i < file_amount; i++){
         wfds[i].head = NULL;
         wfds[i].total_words = 0;
         tokenize_file(&wfds[i], files->paths[i]);
-        compute_frequency(&wfds[i]);
+        if(wfds[i].total_words > 0){
+            compute_frequency(&wfds[i]);
+        }
     }
     int comparisons_length = file_amount * (file_amount - 1) / 2;
     Comparison *comparisons = malloc(comparisons_length * sizeof(Comparison));
+    if(comparisons == NULL){
+        perror("malloc");
+        free(wfds);
+        exit(1);
+    }
 
     int comparison_index = 0;
 
@@ -318,6 +375,10 @@ int main(int argc, char *argv[]){
 
     FileArr files;
     files.paths = malloc(8 * sizeof(char *));
+    if(files.paths == NULL){
+        perror("malloc");
+        exit(1);
+    }
     files.count = 0;
     files.size = 8;
     //ask teacher about suffix because i am not sure how it is given
