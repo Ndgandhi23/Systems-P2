@@ -97,9 +97,9 @@ void find_file(const char *path, FileArr *files, const char* suffix){
     }
 
     if(S_ISREG(st.st_mode)){
-        if(!has_suffix(path, suffix)){
-            return;
-        }
+        // if(!has_suffix(path, suffix)){
+        //     return;
+        // }
         if((files->count) == files->size){
             char** temp = realloc(files->paths, (files->size) * 2 * (sizeof(char *)));
             if (temp == NULL){
@@ -115,6 +115,7 @@ void find_file(const char *path, FileArr *files, const char* suffix){
         
     }
     else if (S_ISDIR(st.st_mode)){
+    //    printf("LOG: in find_file and have found a dir\n");
         search_directory(path, files, suffix);
     }
 
@@ -208,14 +209,14 @@ void tokenize_file(WFD *dist, char* path){
     }
 
     while((n = read(fd, &c, 1)) > 0){
-        if(isspace(c) || (!isalpha(c) && !isdigit(c) && c != '-')){
+        if(isspace(c)){
             word[word_index] = '\0';
             if(word_index > 0){
                 insert_wordNode(dist, word);
             }
             word_index = 0;
         }
-        else{
+        else if(isalnum(c)){
             if(word_index >= word_cap - 1){
                 char *temp = realloc(word, word_cap * 2);
                 if(temp == NULL){
@@ -229,6 +230,9 @@ void tokenize_file(WFD *dist, char* path){
             }
             word[word_index] = tolower(c);
             word_index++;
+        }
+        else{
+            continue;
         }
     }
 
@@ -296,6 +300,23 @@ int compare_fn(const void *a, const void *b){
     return 0;
 }
 
+void print_all_wfds(WFD *wfds, char **filenames, int file_count) {
+    for (int i = 0; i < file_count; i++) {
+        printf("\nFILE: %s\n", filenames[i]);
+        printf("----------------------\n");
+
+        WordNode *current = wfds[i].head;
+
+        while (current != NULL) {
+            printf("word: %-15s count: %-5d freq: %.5f\n",
+                   current->word,
+                   current->count,
+                   current->frequency);
+
+            current = current->next;
+        }
+    }
+}
 
 void analysis_phase(FileArr *files){
     int file_amount = files->count;
@@ -318,6 +339,10 @@ void analysis_phase(FileArr *files){
             compute_frequency(&wfds[i]);
         }
     }
+
+    // LOG: testing word frequency calcs
+    print_all_wfds(wfds, files->paths, file_amount);
+
     int comparisons_length = file_amount * (file_amount - 1) / 2;
     Comparison *comparisons = malloc(comparisons_length * sizeof(Comparison));
     if(comparisons == NULL){
@@ -367,11 +392,11 @@ void analysis_phase(FileArr *files){
 
 
 int main(int argc, char *argv[]){
-    if(argc < 3){
-        //also changed from perror
-        fprintf(stderr, "error: not enough files\n");
-        exit(1);
-    }
+    // if(argc < 3){
+    //     //also changed from perror
+    //     fprintf(stderr, "error: not enough files\n");
+    //     exit(1);
+    // }
 
     FileArr files;
     files.paths = malloc(8 * sizeof(char *));
@@ -382,9 +407,9 @@ int main(int argc, char *argv[]){
     files.count = 0;
     files.size = 8;
     //ask teacher about suffix because i am not sure how it is given
-    char *suffix = argv[1];
+    char *suffix = ".txt";
 
-    for(int i = 2; i < argc; i++){
+    for(int i = 1; i < argc; i++){
         find_file(argv[i], &files, suffix);
     }
 
