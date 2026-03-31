@@ -98,9 +98,6 @@ void find_file(const char *path, FileArr *files, const char* suffix){
     }
 
     if(S_ISREG(st.st_mode)){
-        // if(!has_suffix(path, suffix)){
-        //     return;
-        // }
         if((files->count) == files->size){
             char** temp = realloc(files->paths, (files->size) * 2 * (sizeof(char *)));
             if (temp == NULL){
@@ -111,11 +108,26 @@ void find_file(const char *path, FileArr *files, const char* suffix){
             files->paths = temp;
             files->size = files->size * 2;
         }
+        
+        const char *edge_check_name = strrchr(path, '/');
+        if (edge_check_name) {
+            edge_check_name++; 
+            if (edge_check_name[0] == '.') {
+                fprintf(stderr, "error: files beginning in . do not take\n");
+                return;
+            }
+        }
+        
+
         files->paths[files->count] = strdup(path);
         files->count = files->count+1;
         
     }
     else if (S_ISDIR(st.st_mode)){
+        if(path[0] == '.'){
+            fprintf(stderr, "error: directories beginning in . do not take\n");
+            return;
+        }
         search_directory(path, files, suffix);
     }
 
