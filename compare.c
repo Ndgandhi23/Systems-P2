@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#define SUFFIX ".txt"
 typedef struct WordNode {
     char *word;
     int count;
@@ -115,7 +116,6 @@ void find_file(const char *path, FileArr *files, const char* suffix){
         
     }
     else if (S_ISDIR(st.st_mode)){
-    //    printf("LOG: in find_file and have found a dir\n");
         search_directory(path, files, suffix);
     }
 
@@ -216,7 +216,7 @@ void tokenize_file(WFD *dist, char* path){
             }
             word_index = 0;
         }
-        else if(isalnum(c)){
+        else if(isalnum(c) || c == '-'){
             if(word_index >= word_cap - 1){
                 char *temp = realloc(word, word_cap * 2);
                 if(temp == NULL){
@@ -392,11 +392,11 @@ void analysis_phase(FileArr *files){
 
 
 int main(int argc, char *argv[]){
-    // if(argc < 3){
-    //     //also changed from perror
-    //     fprintf(stderr, "error: not enough files\n");
-    //     exit(1);
-    // }
+    if(argc < 2){
+        //also changed from perror
+        fprintf(stderr, "error: not enough files\n");
+        exit(1);
+    }
 
     FileArr files;
     files.paths = malloc(8 * sizeof(char *));
@@ -406,11 +406,9 @@ int main(int argc, char *argv[]){
     }
     files.count = 0;
     files.size = 8;
-    //ask teacher about suffix because i am not sure how it is given
-    char *suffix = ".txt";
 
     for(int i = 1; i < argc; i++){
-        find_file(argv[i], &files, suffix);
+        find_file(argv[i], &files, SUFFIX);
     }
 
     analysis_phase(&files);

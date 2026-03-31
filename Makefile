@@ -1,5 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -g
+SANFLAGS = -fsanitize=address,undefined -fno-omit-frame-pointer
 LDFLAGS = -lm
 
 TARGET = compare
@@ -16,6 +17,6 @@ clean:
 	rm -f $(OBJS) $(TARGET)
 
 san:
-	$(CC) $(CFLAGS) -fsanitize=address,undefined $(SRCS) -o $(TARGET) $(LDFLAGS)
+	$(CC) $(CFLAGS) $(SANFLAGS) $(SRCS) -o $(TARGET) $(LDFLAGS)
 
 .PHONY: clean san
