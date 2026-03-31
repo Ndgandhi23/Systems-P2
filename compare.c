@@ -321,7 +321,8 @@ void print_all_wfds(WFD *wfds, char **filenames, int file_count) {
 void analysis_phase(FileArr *files){
     int file_amount = files->count;
     if(file_amount < 2){
-        //corrected from perror because not system file and was unreliable
+        for(int i = 0; i < files->count; i++) free(files->paths[i]);
+        free(files->paths);
         fprintf(stderr, "error: Not enough files found for analysis phase\n");
         exit(1);
     }
@@ -329,6 +330,8 @@ void analysis_phase(FileArr *files){
     WFD *wfds = malloc(file_amount * sizeof(WFD));
     if(wfds == NULL){
         perror("malloc");
+        for(int i = 0; i < files->count; i++) free(files->paths[i]);
+        free(files->paths);
         exit(1);
     }
     for(int i = 0; i < file_amount; i++){
@@ -347,7 +350,13 @@ void analysis_phase(FileArr *files){
     Comparison *comparisons = malloc(comparisons_length * sizeof(Comparison));
     if(comparisons == NULL){
         perror("malloc");
+        for(int i = 0; i < file_amount; i++){
+            WordNode *cur = wfds[i].head;
+            while(cur){ WordNode *next = cur->next; free(cur->word); free(cur); cur = next; }
+        }
         free(wfds);
+        for(int i = 0; i < files->count; i++) free(files->paths[i]);
+        free(files->paths);
         exit(1);
     }
 
