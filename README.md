@@ -14,7 +14,9 @@ Collection Phase
     - for example: if the user enter foo, foo is stored as foo in the files NOT foo.txt, although it is a ".txt" file
 - We also tokenize each file to make sure we are storing words correctly. For example, words are allowed to have letters, numbers, and hyphens. All of punctutation is ignored. In addition to this, spaces are the only thing that can create a new word and all letters are set to lower case.
     - for example: "Can't" and "cant" are treated as the same word.
-
+- If the user provides a file that begins with "." in the input, the file prints an error message
+    - for example: ./compare testA .testA will print an error message
+    - for example: ./compare testA test_dir/.testA will print an error message
 - Over all structure:
     - FileArr keeps track of all files
     - each file is assigned its own list of Wordnodes using WFD
